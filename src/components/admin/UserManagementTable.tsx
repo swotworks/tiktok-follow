@@ -125,6 +125,62 @@ export const UserManagementTable = () => {
     }
   };
 
+  const handleApproveAllPending = async (logs: any[]) => {
+    const pendingLogs = logs.filter(log => log.status === 'Pending');
+    if (pendingLogs.length === 0) return;
+
+    if (!confirm(`Are you sure you want to approve all ${pendingLogs.length} pending submissions?`)) {
+      return;
+    }
+
+    try {
+      const promises = pendingLogs.map(async (log) => {
+        const res = await fetchWithAuth(`/tasks/admin/approve/${log.id}`, {
+          method: 'POST'
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to approve log ${log.id}`);
+        }
+      });
+
+      await Promise.all(promises);
+      alert(`Successfully approved all ${pendingLogs.length} pending submissions!`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert("Error approving some submissions. Please refresh and check.");
+      fetchUsers();
+    }
+  };
+
+  const handleRejectAllPending = async (logs: any[]) => {
+    const pendingLogs = logs.filter(log => log.status === 'Pending');
+    if (pendingLogs.length === 0) return;
+
+    if (!confirm(`Are you sure you want to reject all ${pendingLogs.length} pending submissions?`)) {
+      return;
+    }
+
+    try {
+      const promises = pendingLogs.map(async (log) => {
+        const res = await fetchWithAuth(`/tasks/admin/reject/${log.id}`, {
+          method: 'POST'
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to reject log ${log.id}`);
+        }
+      });
+
+      await Promise.all(promises);
+      alert(`Successfully rejected all ${pendingLogs.length} pending submissions!`);
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert("Error rejecting some submissions. Please refresh and check.");
+      fetchUsers();
+    }
+  };
+
   const handleRejectSubmission = async (logId: string) => {
     if (!confirm("Are you sure you want to reject this submission? This will deduct the user's credits and send an attention alert to their inbox.")) {
       return;
@@ -318,10 +374,28 @@ export const UserManagementTable = () => {
 
                           {/* Submitted Tasks Box */}
                           <div className="bg-slate-900 border border-white/10 rounded-xl p-4">
-                            <h4 className="text-white font-bold mb-3 flex items-center">
-                              <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                              Submitted Tasks (Logs)
-                            </h4>
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="text-white font-bold flex items-center">
+                                <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+                                Submitted Tasks (Logs)
+                              </h4>
+                              {submittedTasks.some(log => log.status === 'Pending') && (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleApproveAllPending(submittedTasks)}
+                                    className="text-[10px] px-2 py-1 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded border border-green-500/20 font-bold transition-colors"
+                                  >
+                                    Approve All Pending
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectAllPending(submittedTasks)}
+                                    className="text-[10px] px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded border border-red-500/20 font-bold transition-colors"
+                                  >
+                                    Reject All Pending
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                             {submittedTasks.length > 0 ? (
                               <ul className="space-y-2 max-h-48 overflow-y-auto">
                                 {submittedTasks.map(log => (
