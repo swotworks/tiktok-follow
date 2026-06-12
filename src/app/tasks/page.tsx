@@ -15,6 +15,8 @@ export default function TaskPoolPage() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [completedLogs, setCompletedLogs] = useState<any[]>([]);
   const [pendingLogs, setPendingLogs] = useState<any[]>([]);
+  const [allLogs, setAllLogs] = useState<any[]>([]);
+  const [followersGained, setFollowersGained] = useState<number>(0);
 
   useEffect(() => {
     if (user) {
@@ -34,8 +36,21 @@ export default function TaskPoolPage() {
         .select('task_id, worker_id, status')
         .then(({ data, error }) => {
           if (data && !error) {
+            setAllLogs(data);
             setCompletedLogs(data.filter((log: any) => log.status === 'Success'));
             setPendingLogs(data.filter((log: any) => log.status === 'Pending'));
+          }
+        });
+
+      // Fetch user's own campaigns to count followers gained
+      supabase
+        .from('tasks')
+        .select('current_follows')
+        .eq('creator_id', user.id)
+        .then(({ data, error }) => {
+          if (data && !error) {
+            const total = data.reduce((sum: number, t: any) => sum + (t.current_follows || 0), 0);
+            setFollowersGained(total);
           }
         });
     }
@@ -54,6 +69,10 @@ export default function TaskPoolPage() {
   if (!user) {
     return null;
   }
+
+  const totalSubmitted = allLogs.length;
+  const pendingCount = allLogs.filter((log: any) => log.status === 'Pending').length;
+  const rejectedCount = allLogs.filter((log: any) => log.status === 'Failed' || log.status === 'Dropped').length;
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -112,6 +131,65 @@ export default function TaskPoolPage() {
           <p className="text-lg text-gray-400">
             Follow the accounts below to earn credits.
           </p>
+        </div>
+
+        {/* Stats Dashboard */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {/* Card 1: Submitted */}
+          <div className="relative overflow-hidden rounded-2xl bg-white/5 p-6 border border-white/10 shadow-lg backdrop-blur-md group hover:border-blue-500/30 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total Submitted</p>
+                <h3 className="text-2xl font-black text-white mt-1">{totalSubmitted}</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Pending */}
+          <div className="relative overflow-hidden rounded-2xl bg-white/5 p-6 border border-white/10 shadow-lg backdrop-blur-md group hover:border-amber-500/30 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Pending Verification</p>
+                <h3 className="text-2xl font-black text-white mt-1">{pendingCount}</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Rejected */}
+          <div className="relative overflow-hidden rounded-2xl bg-white/5 p-6 border border-white/10 shadow-lg backdrop-blur-md group hover:border-red-500/30 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl group-hover:bg-red-500/10 transition-colors" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Rejected Tasks</p>
+                <h3 className="text-2xl font-black text-white mt-1">{rejectedCount}</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Followers Gained */}
+          <div className="relative overflow-hidden rounded-2xl bg-white/5 p-6 border border-white/10 shadow-lg backdrop-blur-md group hover:border-emerald-500/30 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Followers Gained</p>
+                <h3 className="text-2xl font-black text-white mt-1">{followersGained}</h3>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">

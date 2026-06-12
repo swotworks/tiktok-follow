@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { fetchWithAuth } from '@/lib/api';
 
 interface Task {
   id: string;
@@ -81,6 +82,47 @@ export const UserManagementTable = () => {
 
   const toggleExpand = (userId: string) => {
     setExpandedUserId(expandedUserId === userId ? null : userId);
+  };
+
+  const handleApproveSubmission = async (logId: string) => {
+    try {
+      const res = await fetchWithAuth(`/tasks/admin/approve/${logId}`, {
+        method: 'POST'
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to approve");
+      }
+      
+      alert("Submission successfully approved!");
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Failed to approve submission.");
+    }
+  };
+
+  const handleRejectPendingSubmission = async (logId: string) => {
+    if (!confirm("Are you sure you want to reject this submission?")) {
+      return;
+    }
+    try {
+      const res = await fetchWithAuth(`/tasks/admin/reject/${logId}`, {
+        method: 'POST'
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to reject");
+      }
+      
+      alert("Submission rejected!");
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Failed to reject submission.");
+    }
   };
 
   const handleRejectSubmission = async (logId: string) => {
@@ -291,11 +333,29 @@ export const UserManagementTable = () => {
                                     <div className="flex items-center gap-3">
                                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                                         log.status === 'Success' ? 'bg-green-500/20 text-green-400' :
-                                        log.status === 'Processing' ? 'bg-yellow-500/20 text-yellow-400' :
+                                        log.status === 'Pending' || log.status === 'Processing' ? 'bg-yellow-500/20 text-yellow-400' :
                                         'bg-red-500/20 text-red-400'
                                       }`}>
                                         {log.status}
                                       </span>
+                                      {log.status === 'Pending' && (
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => handleApproveSubmission(log.id)}
+                                            className="text-xs px-2 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 hover:text-green-300 rounded border border-green-500/25 font-semibold transition-colors flex items-center gap-1"
+                                            title="Approve Follow"
+                                          >
+                                            Approve ✓
+                                          </button>
+                                          <button
+                                            onClick={() => handleRejectPendingSubmission(log.id)}
+                                            className="text-xs px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded border border-red-500/25 font-semibold transition-colors flex items-center gap-1"
+                                            title="Reject Follow"
+                                          >
+                                            Reject ✗
+                                          </button>
+                                        </div>
+                                      )}
                                       {log.status === 'Success' && (
                                         <button
                                           onClick={() => handleRejectSubmission(log.id)}
