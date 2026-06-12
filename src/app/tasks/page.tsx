@@ -14,6 +14,7 @@ export default function TaskPoolPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
   const [completedLogs, setCompletedLogs] = useState<any[]>([]);
+  const [pendingLogs, setPendingLogs] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -27,14 +28,14 @@ export default function TaskPoolPage() {
         .then(data => setWorkers(data))
         .catch(console.error);
 
-      // Fetch completed logs to know which worker accounts have completed which tasks
+      // Fetch logs to know which worker accounts have completed or pending tasks
       supabase
         .from('task_logs')
-        .select('task_id, worker_id')
-        .eq('status', 'Success')
+        .select('task_id, worker_id, status')
         .then(({ data, error }) => {
           if (data && !error) {
-            setCompletedLogs(data);
+            setCompletedLogs(data.filter((log: any) => log.status === 'Success'));
+            setPendingLogs(data.filter((log: any) => log.status === 'Pending'));
           }
         });
     }
@@ -120,6 +121,10 @@ export default function TaskPoolPage() {
               task={task} 
               workers={workers}
               initialCompletedWorkerIds={completedLogs
+                .filter(log => log.task_id === task.id)
+                .map(log => log.worker_id)
+              }
+              initialPendingWorkerIds={pendingLogs
                 .filter(log => log.task_id === task.id)
                 .map(log => log.worker_id)
               }

@@ -5,7 +5,7 @@ import { Spinner } from './ui/Spinner';
 import { fetchWithAuth } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
-export type TaskStatus = 'idle' | 'ready_to_verify' | 'verifying' | 'completed' | 'failed';
+export type TaskStatus = 'idle' | 'ready_to_verify' | 'verifying' | 'completed' | 'failed' | 'submitted';
 
 interface TaskCardProps {
   task: {
@@ -15,13 +15,15 @@ interface TaskCardProps {
   };
   workers: any[];
   initialCompletedWorkerIds?: string[];
+  initialPendingWorkerIds?: string[];
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialCompletedWorkerIds }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialCompletedWorkerIds, initialPendingWorkerIds }) => {
   const [status, setStatus] = useState<TaskStatus>('idle');
   const [taskLogId, setTaskLogId] = useState<string | null>(null);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | ''>('');
   const [completedWorkerIds, setCompletedWorkerIds] = useState<string[]>(initialCompletedWorkerIds || []);
+  const [pendingWorkerIds, setPendingWorkerIds] = useState<string[]>(initialPendingWorkerIds || []);
   const { updateCredits } = useAuth();
 
   useEffect(() => {
@@ -30,9 +32,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
     }
   }, [initialCompletedWorkerIds]);
 
-  // Reset completed status after 3 seconds to let them pick other workers
   useEffect(() => {
-    if (status === 'completed') {
+    if (initialPendingWorkerIds) {
+      setPendingWorkerIds(initialPendingWorkerIds);
+    }
+  }, [initialPendingWorkerIds]);
+
+  // Reset completed or submitted status after 3 seconds to let them pick other workers
+  useEffect(() => {
+    if (status === 'completed' || status === 'submitted') {
       const timer = setTimeout(() => {
         setStatus('idle');
         setSelectedWorkerId('');
@@ -71,28 +79,43 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
           }
 
           const data = await res.json();
-          if (data.status === 'Success') {
-            updateCredits(task.reward_credits);
-            return worker.id;
+          if (data.status === 'Success' || data.status === 'Pending') {
+            return { id: worker.id, status: data.status };
           }
           throw new Error(`Failed verification for @${worker.tiktok_username}`);
         });
 
         const results = await Promise.allSettled(promises);
-        const succeededIds: string[] = [];
+        const succeededCompletedIds: string[] = [];
+        const succeededPendingIds: string[] = [];
         const errors: string[] = [];
 
         results.forEach((r) => {
           if (r.status === 'fulfilled') {
-            succeededIds.push(r.value);
+            if (r.value.status === 'Success') {
+              succeededCompletedIds.push(r.value.id);
+            } else {
+              succeededPendingIds.push(r.value.id);
+            }
           } else if (r.status === 'rejected') {
             errors.push(r.reason.message || 'Error');
           }
         });
 
-        if (succeededIds.length > 0) {
-          setCompletedWorkerIds(prev => [...prev, ...succeededIds]);
-          setStatus('completed');
+        if (succeededCompletedIds.length > 0 || succeededPendingIds.length > 0) {
+          if (succeededCompletedIds.length > 0) {
+            setCompletedWorkerIds(prev => [...prev, ...succeededCompletedIds]);
+            updateCredits(task.reward_credits * succeededCompletedIds.length);
+          }
+          if (succeededPendingIds.length > 0) {
+            setPendingWorkerIds(prev => [...prev, ...succeededPendingIds]);
+          }
+          
+          if (succeededPendingIds.length > 0) {
+            setStatus('submitted');
+          } else {
+            setStatus('completed');
+          }
         } else {
           setStatus('failed');
           alert("Failed to submit: " + errors.join(', '));
@@ -117,6 +140,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
           setStatus('completed');
           updateCredits(task.reward_credits);
           setCompletedWorkerIds(prev => [...prev, selectedWorkerId]);
+        } else if (data.status === 'Pending') {
+          setStatus('submitted');
+          setPendingWorkerIds(prev => [...prev, selectedWorkerId]);
         }
       }
     } catch (error: any) {
@@ -126,48 +152,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
     }
   };
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    const pollStatus = async () => {
-      if (!taskLogId) return;
-
-      try {
-        const res = await fetchWithAuth(`/tasks/status/${taskLogId}`);
-        if (!res.ok) throw new Error('Polling error');
-        const data = await res.json();
-        
-        if (data.status === 'Success') {
-           setStatus('completed');
-           updateCredits(task.reward_credits);
-           if (selectedWorkerId) {
-             setCompletedWorkerIds(prev => [...prev, selectedWorkerId]);
-           }
-           clearInterval(interval);
-        } else if (data.status === 'Failed') {
-           setStatus('failed');
-           clearInterval(interval);
-        }
-      } catch (error) {
-        console.error('Polling failed', error);
-        setStatus('failed');
-        clearInterval(interval);
-      }
-    };
-
-    if (status === 'verifying' && taskLogId) {
-      interval = setInterval(() => {
-         pollStatus();
-      }, 3000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [status, taskLogId, task.reward_credits, updateCredits, selectedWorkerId]);
-
-  // Filter out workers that have already completed this task
-  const availableWorkers = workers.filter(w => !completedWorkerIds.includes(w.id));
+  // Filter out workers that have already completed or submitted this task
+  const availableWorkers = workers.filter(w => !completedWorkerIds.includes(w.id) && !pendingWorkerIds.includes(w.id));
   const allWorkersCompleted = workers.length > 0 && availableWorkers.length === 0;
 
   return (
@@ -232,7 +218,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
               {status === 'verifying' && (
                 <button disabled className="w-full py-3 px-4 bg-white/10 text-gray-300 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
                   <Spinner />
-                  <span>Verifying in Process...</span>
+                  <span>Submitting to Admin...</span>
+                </button>
+              )}
+
+              {status === 'submitted' && (
+                <button disabled className="w-full py-3 px-4 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-default">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span>Submitted to Admin</span>
                 </button>
               )}
 
