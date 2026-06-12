@@ -51,7 +51,7 @@ export const Navbar = () => {
   if (!user) return null;
 
   return (
-    <nav className="p-4 flex gap-6 items-center border-b border-white/5 bg-slate-900/50 backdrop-blur-md">
+    <nav className="p-4 flex flex-wrap gap-4 sm:gap-6 items-center border-b border-white/5 bg-slate-900/50 backdrop-blur-md">
       <Link href="/tasks" className="text-gray-300 hover:text-white transition-colors font-medium">Task Pool</Link>
       <Link href="/accounts" className="text-gray-300 hover:text-white transition-colors font-medium">Manage Accounts</Link>
       <Link href="/inbox" className="text-gray-300 hover:text-white transition-colors font-medium flex items-center gap-1.5 relative">
@@ -64,8 +64,8 @@ export const Navbar = () => {
         )}
       </Link>
       
-      {/* Spacer to push remaining items to the right if needed */}
-      <div className="flex-grow"></div>
+      {/* Spacer to push remaining items to the right if needed on desktop */}
+      <div className="hidden sm:block flex-grow"></div>
       
       <div className="flex items-center gap-4">
         <span className="text-cyan-400 font-mono text-sm bg-cyan-500/10 px-3 py-1.5 rounded-lg border border-cyan-500/20">

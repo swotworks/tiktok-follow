@@ -25,6 +25,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
   const [completedWorkerIds, setCompletedWorkerIds] = useState<string[]>(initialCompletedWorkerIds || []);
   const [pendingWorkerIds, setPendingWorkerIds] = useState<string[]>(initialPendingWorkerIds || []);
   const { updateCredits } = useAuth();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialCompletedWorkerIds) {
@@ -49,14 +50,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
     }
   }, [status]);
 
-  const handleFollowClick = () => {
-    window.open(`https://www.tiktok.com/@${task.target_tiktok_username}`, '_blank');
-    setStatus('ready_to_verify');
-  };
-
   const handleVerifyClick = async () => {
+    setErrorMsg(null);
     if (!selectedWorkerId) {
-      alert("Please select the TikTok account you used to follow.");
+      setErrorMsg("Please select the TikTok account you used to follow.");
       return;
     }
     
@@ -118,7 +115,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
           }
         } else {
           setStatus('failed');
-          alert("Failed to submit: " + errors.join(', '));
+          setErrorMsg("Failed to submit: " + errors.join(', '));
         }
       } else {
         const res = await fetchWithAuth('/tasks/verify', {
@@ -147,7 +144,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
       }
     } catch (error: any) {
       console.error(error);
-      alert(error.message || 'Verification failed');
+      setErrorMsg(error.message || 'Verification failed');
       setStatus('failed');
     }
   };
@@ -174,6 +171,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
         </div>
 
         <div className="mt-auto pt-4 border-t border-white/10">
+          {errorMsg && (
+            <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+              <span className="font-medium">{errorMsg}</span>
+              <button 
+                type="button" 
+                onClick={() => setErrorMsg(null)} 
+                className="text-red-400/60 hover:text-red-400 font-bold ml-2 text-sm focus:outline-none"
+              >
+                ×
+              </button>
+            </div>
+          )}
           {allWorkersCompleted ? (
             <button disabled className="w-full py-3 px-4 bg-green-500/20 text-green-400 border border-green-500/30 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-default">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -182,12 +191,32 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
           ) : (
             <>
               {status === 'idle' && (
-                <button
-                  onClick={handleFollowClick}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white rounded-xl font-medium transition-all transform active:scale-95 shadow-[0_0_15px_rgba(236,72,153,0.5)]"
-                >
-                  Follow User
-                </button>
+                <div className="space-y-3">
+                  <a
+                    href={`https://www.tiktok.com/@${task.target_tiktok_username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      setStatus('ready_to_verify');
+                      setErrorMsg(null);
+                    }}
+                    className="block text-center w-full py-3 px-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white rounded-xl font-medium transition-all transform active:scale-95 shadow-[0_0_15px_rgba(236,72,153,0.5)]"
+                  >
+                    Follow User
+                  </a>
+                  
+                  {/* Direct App Link for mobile devices */}
+                  <a
+                    href={`tiktok://user/profile/${task.target_tiktok_username}`}
+                    onClick={() => {
+                      setStatus('ready_to_verify');
+                      setErrorMsg(null);
+                    }}
+                    className="block text-center w-full py-2.5 px-4 border border-white/10 hover:border-white/20 bg-white/5 text-gray-300 hover:text-white text-xs rounded-xl transition-all"
+                  >
+                    Open in TikTok App directly
+                  </a>
+                </div>
               )}
 
               {(status === 'ready_to_verify' || status === 'failed') && (
@@ -195,7 +224,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
                   <select 
                     className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-cyan-500 outline-none"
                     value={selectedWorkerId}
-                    onChange={(e) => setSelectedWorkerId(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedWorkerId(e.target.value);
+                      setErrorMsg(null);
+                    }}
                   >
                     <option value="" disabled>Select your account...</option>
                     {availableWorkers.length > 1 && (
@@ -207,6 +239,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, workers, initialComple
                   </select>
                   
                   <button
+                    type="button"
                     onClick={handleVerifyClick}
                     className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-medium transition-all transform active:scale-95 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
                   >
