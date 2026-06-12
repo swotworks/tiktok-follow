@@ -13,8 +13,6 @@ export default function TaskPoolPage() {
   const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
-  const [completedLogs, setCompletedLogs] = useState<any[]>([]);
-  const [pendingLogs, setPendingLogs] = useState<any[]>([]);
   const [allLogs, setAllLogs] = useState<any[]>([]);
   const [followersGained, setFollowersGained] = useState<number>(0);
 
@@ -37,8 +35,6 @@ export default function TaskPoolPage() {
         .then(({ data, error }) => {
           if (data && !error) {
             setAllLogs(data);
-            setCompletedLogs(data.filter((log: any) => log.status === 'Success'));
-            setPendingLogs(data.filter((log: any) => log.status === 'Pending'));
           }
         });
 
@@ -70,9 +66,15 @@ export default function TaskPoolPage() {
     return null;
   }
 
-  const totalSubmitted = allLogs.length;
-  const pendingCount = allLogs.filter((log: any) => log.status === 'Pending').length;
-  const rejectedCount = allLogs.filter((log: any) => log.status === 'Failed' || log.status === 'Dropped').length;
+  const userWorkerIds = workers.map((w: any) => w.id);
+  const userLogs = allLogs.filter((log: any) => userWorkerIds.includes(log.worker_id));
+
+  const completedLogs = userLogs.filter((log: any) => log.status === 'Success');
+  const pendingLogs = userLogs.filter((log: any) => log.status === 'Pending');
+
+  const totalSubmitted = userLogs.length;
+  const pendingCount = userLogs.filter((log: any) => log.status === 'Pending').length;
+  const rejectedCount = userLogs.filter((log: any) => log.status === 'Failed' || log.status === 'Dropped').length;
 
   return (
     <div className="min-h-screen flex flex-col relative">
